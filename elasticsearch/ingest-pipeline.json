@@ -1,0 +1,14 @@
+{
+  "description": "Copy timestamp to @timestamp when the worker did not set it.",
+  "processors": [
+    {
+      "set": {
+        "field": "@timestamp",
+        "copy_from": "timestamp",
+        "override": false,
+        "ignore_empty_value": true,
+        "ignore_failure": true
+      }
+    }
+  ]
+}

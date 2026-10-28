@@ -1,0 +1,8 @@
+.env
+grafana/provisioning/datasources/datasources.yml
+alertmanager/alertmanager.yml
+loki/loki.yml
+prometheus/prometheus.yml
+**/__pycache__/
+**/*.pyc
+.pytest_cache/

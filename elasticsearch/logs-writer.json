@@ -1,0 +1,9 @@
+{
+  "cluster": [],
+  "indices": [
+    {
+      "names": ["logs-*"],
+      "privileges": ["create_index", "write", "auto_configure", "view_index_metadata"]
+    }
+  ]
+}

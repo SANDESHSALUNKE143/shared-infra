@@ -1,0 +1,42 @@
+{
+  "index_patterns": ["logs-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s",
+      "index.codec": "best_compression",
+      "index.lifecycle.name": "logs-retention",
+      "index.default_pipeline": "logs-shared-logger",
+      "index.mapping.total_fields.limit": 1000
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "timestamp": { "type": "date" },
+        "schema_version": { "type": "integer" },
+        "level": { "type": "keyword" },
+        "message": { "type": "text" },
+        "application": { "type": "keyword" },
+        "environment": { "type": "keyword" },
+        "service_version": { "type": "keyword" },
+        "component": { "type": "keyword" },
+        "cluster": { "type": "keyword" },
+        "region": { "type": "keyword" },
+        "hostname": { "type": "keyword" },
+        "process_id": { "type": "long" },
+        "thread_id": { "type": "long" },
+        "correlation_id": { "type": "keyword" },
+        "metadata": { "type": "object", "dynamic": true },
+        "exception": {
+          "properties": {
+            "type": { "type": "keyword" },
+            "message": { "type": "text" },
+            "traceback": { "type": "text" }
+          }
+        }
+      }
+    }
+  }
+}

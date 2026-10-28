@@ -1,0 +1,7 @@
+# Application scrape targets on this VM's private network.
+# Prometheus reads this file as file service discovery. Keep the list, even when it is empty.
+#
+# - targets: ["10.1.0.8:8080"]
+#   labels:
+#     service: smritikosh
+[]
