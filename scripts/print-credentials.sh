@@ -45,8 +45,8 @@ Neo4j                   http://${host}:7474
   password              ${NEO4J_PASSWORD:-}
 
 App Postgres            127.0.0.1:5432 on this VM
-  database              agentic
-  user                  agentic
+  database              app
+  user                  app
   password              ${SQL_PASSWORD:-}
 
 Elasticsearch           http://127.0.0.1:9200 on this VM

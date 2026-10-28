@@ -192,7 +192,7 @@ Usernames are fixed. `scripts/init-env.sh` generates a password per account and 
 | n8n owner | `N8N_OWNER_EMAIL` (`ops@localhost`) | `N8N_OWNER_PASSWORD` |
 | Qdrant | API key only | `QDRANT_API_KEY` |
 | Neo4j | `neo4j` | `NEO4J_PASSWORD` |
-| App Postgres, database `agentic` | `agentic` | `SQL_PASSWORD` |
+| App Postgres, database `app` | `app` | `SQL_PASSWORD` |
 
 Prometheus, Alertmanager, Loki, the collector, node-exporter, and the worker have no login. Grafana is how you open Prometheus, Loki, Alertmanager, and Elasticsearch. Langfuse also needs `LANGFUSE_NEXTAUTH_SECRET`, `LANGFUSE_SALT`, and `LANGFUSE_ENCRYPTION_KEY`. n8n needs `N8N_ENCRYPTION_KEY`.
 
@@ -227,7 +227,7 @@ pip install "shared-logger[azure]"
 ```
 
 ```bash
-SHARED_LOGGER_APPLICATION=billing
+SHARED_LOGGER_APPLICATION=api
 SHARED_LOGGER_ENVIRONMENT=dev
 SHARED_LOGGER_DESTINATION=azure_queue
 SHARED_LOGGER_DESTINATION_CONFIG={"queue_name":"app-logs","connection_string_env":"AZURE_STORAGE_CONNECTION_STRING"}
@@ -239,9 +239,9 @@ AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=...;
 To scrape an application's `/metrics`, add a target to `prometheus/targets.yml` and run `scripts/up.sh` again:
 
 ```yaml
-- targets: ["10.1.0.8:8080"]
+- targets: ["10.0.0.10:9000"]
   labels:
-    service: smritikosh
+    service: api
 ```
 
 Send traces to `http://PUBLIC_HOST:4318` (HTTP) or port `4317` (gRPC) from a host on the virtual network.

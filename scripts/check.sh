@@ -77,7 +77,7 @@ fi
 sql_ok=0
 for _attempt in $(seq 1 30); do
   if "${compose[@]}" exec -T -e "PGPASSWORD=${SQL_PASSWORD}" sql \
-    psql -U agentic -d agentic -tAc "select 1" | grep -q 1; then
+    psql -U app -d app -tAc "select 1" | grep -q 1; then
     echo "ok sql"
     sql_ok=1
     break

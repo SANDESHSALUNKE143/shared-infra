@@ -15,7 +15,7 @@ def sample_event() -> dict:
         "timestamp": "2026-10-28T05:00:00.000Z",
         "level": "INFO",
         "message": "hello",
-        "application": "billing",
+        "application": "api",
         "environment": "Production",
     }
 
