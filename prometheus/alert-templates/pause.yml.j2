@@ -1,0 +1,12 @@
+{# A series that should keep moving has stopped.
+   expr is the pause condition. duration, severity, and summary are the rule fields. #}
+{% macro rule(name, expr, duration, severity, summary) %}
+      - alert: {{ name }}
+        expr: {{ expr | promql }}
+        for: {{ duration }}
+        labels:
+          severity: {{ severity }}
+          kind: pause
+        annotations:
+          summary: "{{ summary }}"
+{% endmacro %}

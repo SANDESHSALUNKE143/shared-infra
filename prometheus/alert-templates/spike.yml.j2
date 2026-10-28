@@ -1,0 +1,20 @@
+{# The recent rate of a counter is several times its own baseline, and above a floor.
+   metric is a counter name. window is the rate range. baseline is the comparison range.
+   multiplier and min_rate are numbers. duration, severity, and summary are the rule fields. #}
+{% macro rule(name, metric, window, baseline, multiplier, min_rate, duration, severity, summary) %}
+      - alert: {{ name }}
+        expr: |
+          (
+            rate({{ metric }}[{{ window }}])
+            >
+            {{ multiplier }} * avg_over_time(rate({{ metric }}[{{ window }}])[{{ baseline }}:{{ window }}])
+          )
+          and
+          rate({{ metric }}[{{ window }}]) > {{ min_rate }}
+        for: {{ duration }}
+        labels:
+          severity: {{ severity }}
+          kind: spike
+        annotations:
+          summary: "{{ summary }}"
+{% endmacro %}

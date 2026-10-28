@@ -1,0 +1,13 @@
+{# A metric stays on the wrong side of a threshold.
+   name, expr, duration, severity, and summary come from the caller.
+   expr may be one line or several. #}
+{% macro rule(name, expr, duration, severity, summary) %}
+      - alert: {{ name }}
+        expr: {{ expr | promql }}
+        for: {{ duration }}
+        labels:
+          severity: {{ severity }}
+          kind: line
+        annotations:
+          summary: "{{ summary }}"
+{% endmacro %}

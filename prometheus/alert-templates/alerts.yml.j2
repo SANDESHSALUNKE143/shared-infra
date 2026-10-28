@@ -1,0 +1,59 @@
+{% from "pause.yml.j2" import rule as pause -%}
+{% from "line.yml.j2" import rule as line -%}
+{% from "spike.yml.j2" import rule as spike -%}
+groups:
+  - name: shared-infra
+    rules:
+{{ pause(
+  name="TargetDown",
+  expr="up == 0",
+  duration=target_down_for,
+  severity="critical",
+  summary=target_down_summary,
+) -}}
+{{ line(
+  name="LogQueueDepthHigh",
+  expr=queue_expr,
+  duration=queue_for,
+  severity="warning",
+  summary=queue_summary,
+) -}}
+{{ line(
+  name="HostDiskSpaceLow",
+  expr=disk_expr,
+  duration=disk_for,
+  severity="warning",
+  summary=disk_summary,
+) -}}
+{{ line(
+  name="ElasticsearchClusterYellow",
+  expr='elasticsearch_cluster_health_status{color="yellow"} == 1',
+  duration=es_yellow_for,
+  severity="warning",
+  summary="Elasticsearch cluster health is yellow",
+) -}}
+{{ line(
+  name="ElasticsearchClusterRed",
+  expr='elasticsearch_cluster_health_status{color="red"} == 1',
+  duration=es_red_for,
+  severity="critical",
+  summary="Elasticsearch cluster health is red",
+) -}}
+{{ pause(
+  name="LogIndexingPaused",
+  expr=index_pause_expr,
+  duration=index_pause_for,
+  severity="warning",
+  summary="The log worker queue has messages and indexing has paused.",
+) -}}
+{{ spike(
+  name="LogPoisonSpike",
+  metric="log_worker_poison_total",
+  window=poison_window,
+  baseline=poison_baseline,
+  multiplier=poison_multiplier,
+  min_rate=poison_min_rate,
+  duration=poison_for,
+  severity="warning",
+  summary=poison_summary,
+) -}}

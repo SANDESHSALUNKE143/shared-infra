@@ -1,20 +1,25 @@
 groups:
   - name: shared-infra
     rules:
+
       - alert: TargetDown
         expr: up == 0
         for: 2m
         labels:
           severity: critical
+          kind: pause
         annotations:
           summary: "{{ $labels.job }} on {{ $labels.instance }} is down"
+
       - alert: LogQueueDepthHigh
         expr: log_queue_depth > 1000
         for: 10m
         labels:
           severity: warning
+          kind: line
         annotations:
-          summary: The application log queue has more than 1000 messages
+          summary: "The application log queue has more than 1000 messages"
+
       - alert: HostDiskSpaceLow
         expr: |
           (
@@ -25,19 +30,49 @@ groups:
         for: 10m
         labels:
           severity: warning
+          kind: line
         annotations:
-          summary: Filesystem {{ $labels.mountpoint }} is over 85 percent full
+          summary: "Filesystem {{ $labels.mountpoint }} is over 85 percent full"
+
       - alert: ElasticsearchClusterYellow
         expr: elasticsearch_cluster_health_status{color="yellow"} == 1
         for: 5m
         labels:
           severity: warning
+          kind: line
         annotations:
-          summary: Elasticsearch cluster health is yellow
+          summary: "Elasticsearch cluster health is yellow"
+
       - alert: ElasticsearchClusterRed
         expr: elasticsearch_cluster_health_status{color="red"} == 1
         for: 1m
         labels:
           severity: critical
+          kind: line
         annotations:
-          summary: Elasticsearch cluster health is red
+          summary: "Elasticsearch cluster health is red"
+
+      - alert: LogIndexingPaused
+        expr: log_queue_depth > 0 and rate(log_worker_indexed_total[15m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          kind: pause
+        annotations:
+          summary: "The log worker queue has messages and indexing has paused."
+
+      - alert: LogPoisonSpike
+        expr: |
+          (
+            rate(log_worker_poison_total[5m])
+            >
+            5 * avg_over_time(rate(log_worker_poison_total[5m])[1h:5m])
+          )
+          and
+          rate(log_worker_poison_total[5m]) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          kind: spike
+        annotations:
+          summary: "Poisoned log events are more than 5 times the recent baseline"

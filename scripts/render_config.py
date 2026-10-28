@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
+from alert_rules import render_alerts
 from export_env import parse_env
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +56,7 @@ def main() -> None:
 
     prometheus = (ROOT / "prometheus" / "prometheus.yml.tpl").read_text(encoding="utf-8")
     write(ROOT / "prometheus" / "prometheus.yml", prometheus.replace("__ENV_NAME__", env_name))
+    write(ROOT / "prometheus" / "alerts.yml", render_alerts(values))
 
     datasources = (ROOT / "grafana" / "provisioning" / "datasources" / "datasources.yml.tpl").read_text(
         encoding="utf-8"

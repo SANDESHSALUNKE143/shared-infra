@@ -69,7 +69,7 @@ flowchart LR
   am -->|optional| hook[ALERT_WEBHOOK_URL]
 ```
 
-Rules cover a target that is down, a log queue deeper than 1000 messages for 10 minutes, a disk past 85 percent full, and an Elasticsearch cluster that is yellow or red. `scripts/fire-test-alert.sh` posts one synthetic alert so you can see this path.
+Rules cover a target that is down, a log queue deeper than 1000 messages for 10 minutes, a disk past 85 percent full, an Elasticsearch cluster that is yellow or red, indexing that has paused while the queue still has messages, and a spike in poisoned events. `scripts/fire-test-alert.sh` posts one synthetic alert so you can see this path.
 
 ### Everything on the VM
 
@@ -317,12 +317,11 @@ A three-node Elasticsearch cluster, Prometheus federation, and a Blob archive be
 
 Prometheus loads `prometheus/alerts.yml` and scrapes itself, Alertmanager, node-exporter, the Elasticsearch exporter, the log worker, and `prometheus/targets.yml`.
 
-Rules:
+`scripts/up.sh` renders that file from the Jinja templates in `prometheus/alert-templates`. Three shapes are there to copy: a threshold (`line`), a series that has stopped (`pause`), and a counter rate that jumps above its own baseline (`spike`). The rendered rules are a target down, a log queue deeper than 1000 for 10 minutes, a disk past 85 percent full, Elasticsearch yellow or red, indexing paused while the queue still has messages, and a spike in poisoned events. Those last two are about the `logs-*` indexes: paused means documents are not landing, and poisoned events never become documents.
 
-- a scrape target is down, including the log worker
-- `log_queue_depth` stays above 1000 for 10 minutes
-- a filesystem is over 85 percent full
-- Elasticsearch cluster health is yellow or red
+Every threshold is a key in `.env`, and a missing key keeps the default. The full list, the index template those alerts protect, and what to check when one fires are in [docs/alerts.md](docs/alerts.md).
+
+Set a value, run `scripts/up.sh`, then restart Prometheus so it reads the new file: `docker compose --env-file .env restart prometheus`. The host needs the `python3-jinja2` package, which `scripts/bootstrap-vm.sh` installs.
 
 Firing alerts show in Alertmanager and in Grafana's Alertmanager datasource. Set `ALERT_WEBHOOK_URL` when you have Slack, Teams, or email in front of a webhook, then run `scripts/up.sh` again. Leave it empty and alerts still appear in the UI.
 
@@ -365,8 +364,9 @@ No host port: log worker (this repo's image), node-exporter `prom/node-exporter:
 - `docker-compose.yml` — every service, memory caps, healthchecks, named volumes
 - `log-worker/` — queue consumer, Dockerfile, and unit tests
 - `elasticsearch/` — passwords, roles, index template, retention, Kibana data view
-- `prometheus/` — scrape config, alert rules, application targets
+- `prometheus/` — scrape config, Jinja alert templates, application targets
 - `alertmanager/` — webhook filled from `.env` at start
 - `otel/otel-collector.yaml` — OTLP in, Langfuse out
 - `grafana/provisioning/` — datasource template
+- `docs/alerts.md` — alert settings, the three rule templates, and the `logs-*` index they watch
 - `scripts/` — bootstrap, init-env, up, check, print-credentials, peek-poison, fire-test-alert
