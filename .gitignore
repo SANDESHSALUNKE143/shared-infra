@@ -6,3 +6,13 @@ prometheus/prometheus.yml
 **/__pycache__/
 **/*.pyc
 .pytest_cache/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+terraform/ci.auto.tfvars
+terraform/backend.hcl
