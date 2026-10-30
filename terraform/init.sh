@@ -74,7 +74,8 @@ if ! az storage account show --name "$account" --resource-group "$rg" >/dev/null
   apply_bootstrap
   mv "$backend_off" "$backend_file"
   migrated=0
-  for _ in $(seq 1 10); do
+  # Blob data-plane permission can take several minutes after the role assignment.
+  for _ in $(seq 1 24); do
     if terraform -chdir=terraform/bootstrap init -input=false -migrate-state -force-copy \
       "${backend[@]}" -backend-config="key=bootstrap.tfstate"; then
       migrated=1

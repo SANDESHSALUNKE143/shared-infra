@@ -64,6 +64,22 @@ The dev machine from the first apply:
 | Neo4j Browser | http://20.235.66.42:7474 |
 | Neo4j Bolt | `bolt://20.235.66.42:7687` |
 
+The production machine from the first apply uses the same password:
+
+| | |
+| --- | --- |
+| Resource group | `rg-shared-infra-prod` in Central India |
+| Virtual machine | `vm-infra-prod` |
+| SSH | `ssh azureuser@20.219.6.224` |
+| Grafana | http://20.219.6.224:3000 |
+| Kibana | http://20.219.6.224:5601 |
+| Langfuse | http://20.219.6.224:3003 |
+| n8n | http://20.219.6.224:5678 |
+| MLflow | http://20.219.6.224:5000 |
+| Qdrant | http://20.219.6.224:6333 |
+| Neo4j Browser | http://20.219.6.224:7474 |
+| Neo4j Bolt | `bolt://20.219.6.224:7687` |
+
 Prometheus `9090`, Alertmanager `9093`, Loki `3100`, Elasticsearch `9200`, and app Postgres `5432` listen on `127.0.0.1` on that machine. OpenTelemetry `4317` and `4318` accept traffic from the virtual network.
 
 ## Sign-in accounts
