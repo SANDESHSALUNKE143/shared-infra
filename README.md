@@ -6,16 +6,19 @@ n8n is source-available. Read [its license](https://github.com/n8n-io/n8n/blob/m
 
 ## Where it runs
 
-Create one Azure resource group. Inside it, create one Ubuntu 24.04 virtual machine per environment (`vm-infra-dev`, `vm-infra-staging`, `vm-infra-prod`, or names you prefer). The machine is for this stack only.
+One Ubuntu 24.04 virtual machine per environment runs this stack. The environments are dev, UAT, and production. Terraform creates the machine and the Azure resources around it: the network, the firewall, the disks, the storage account, the `app-logs` and `app-logs-poison` queues, the registry, Key Vault, backup, alerts, and the night shutdown on dev and UAT.
 
-- Size: at least 8 vCPU and 32 GiB RAM (`Standard_D8s_v5`). 64 GiB (`Standard_E8s_v5`) is the comfortable size. Langfuse and ClickHouse want about 16 GiB, and Elasticsearch is capped at a 2 GiB heap.
-- OS disk: at least 256 GiB.
-- On the VM, clone this folder to `/opt/shared-infra`.
-- Also create one storage account and a queue named `app-logs` for that environment. The worker creates `app-logs-poison` on startup.
+The only Azure object that already exists is an empty resource group. Its name is in `terraform/environments/<environment>.tfvars`. Terraform does not create that group.
 
-`PUBLIC_HOST` in `.env` is the hostname or IP operators type in a browser. Do not include `http://`.
+| Environment | Branch | Virtual machine | Size |
+| --- | --- | --- | --- |
+| dev | `dev` | `vm-infra-dev` | 4 vCPU, 32 GiB |
+| uat | `uat` | `vm-infra-uat` | 8 vCPU, 32 GiB |
+| prod | `main` | `vm-infra-prod` | 8 vCPU, 64 GiB |
 
-This folder does not call `az`, Terraform, or Bicep. You create the resource group, the VM, the storage account, and the queue.
+Docker volumes sit on a data disk of 256 GiB (dev), 512 GiB (UAT), or 1024 GiB (production). Elasticsearch stays on a 2 GiB heap. The boot service clones this repo to `/opt/shared-infra`, writes `.env`, and starts Compose. `PUBLIC_HOST` is the virtual machine's public IP, with no `http://`.
+
+The sizes, the monthly budget, and the operator addresses are tfvars. The longer page is [terraform/README.md](terraform/README.md).
 
 ## Architecture
 
@@ -40,18 +43,18 @@ A good event has `schema_version` 1, a `timestamp`, and an `environment`. The in
 
 ### What you run
 
-You create the Azure pieces. This folder does not. On the VM you generate passwords, start Compose, then open the UIs that have a login.
+Terraform creates the Azure resources. The boot service on the virtual machine generates passwords, starts Compose, and the UIs that have a login come up.
 
 ```mermaid
 flowchart TD
-  you[You] --> azure[Resource group, one VM, storage queue]
-  azure --> vm[Ubuntu VM /opt/shared-infra]
-  vm --> boot[bootstrap-vm.sh]
-  boot --> env[init-env.sh and edit .env]
-  env --> up[up.sh]
-  up --> compose[Docker Compose]
+  you[You] --> pr[Pull request plans]
+  pr --> branch[Merge into dev, uat, or main]
+  branch --> tf[Terraform]
+  tf --> azure[Network, one VM, queue, vault, backup]
+  azure --> boot[Boot service on the VM]
+  boot --> compose[Docker Compose]
   compose --> ui[Grafana Kibana Langfuse n8n MLflow Neo4j Qdrant]
-  up --> check[check.sh]
+  boot --> check[check.sh]
 ```
 
 ### Alerts
@@ -132,41 +135,31 @@ flowchart TB
 
 Application hosts never open Elasticsearch. They enqueue logs, send traces to the collector on the virtual network, and expose `/metrics` for Prometheus. Operators use Kibana for logs and Grafana for metrics, Loki, and alerts.
 
-## Create the Azure pieces
+## Ports
 
-Network security group:
+Terraform's network security group is the firewall on the virtual machine.
 
-- SSH from your IP.
-- Publish only UIs that have a login, and only to your IP or the virtual network: Grafana `3000`, Kibana `5601`, Langfuse `3003`, n8n `5678`, MLflow `5000`, Neo4j `7474` and `7687`, Qdrant `6333`.
-- OpenTelemetry `4317` and `4318` stay on the virtual network. The collector has no login.
-- Do not publish Elasticsearch `9200`, Prometheus `9090`, Alertmanager `9093`, Loki `3100`, or the worker. Those bind to `127.0.0.1` on the VM.
-- Application VMs do not need a path to Elasticsearch. They need outbound HTTPS to the storage account.
-- This VM needs outbound HTTPS to Azure Storage.
+- SSH from `operator_cidrs` in the tfvars file.
+- These UIs, from those same addresses and from the virtual network: Grafana `3000`, Kibana `5601`, Langfuse `3003`, n8n `5678`, MLflow `5000`, Neo4j `7474` and `7687`, Qdrant `6333`.
+- OpenTelemetry `4317` and `4318` from the virtual network. The collector has no login.
+- Elasticsearch `9200`, Prometheus `9090`, Alertmanager `9093`, Loki `3100`, and the worker stay off the security group. They bind to `127.0.0.1` on the VM.
+- Application hosts reach the storage account over HTTPS. They do not open Elasticsearch.
+- This VM reaches Azure Storage and Key Vault over HTTPS.
 
 ## Start it
 
-SSH to the VM, clone this folder to `/opt/shared-infra`, then:
+The boot service installs Docker, fills `ENV_NAME`, `PUBLIC_HOST`, and `AZURE_STORAGE_CONNECTION_STRING`, and runs `scripts/up.sh`. SSH when you want the passwords or a check. The private key is the Key Vault secret `vm-ssh-private-key` and the GitHub environment secret `VM_SSH_PRIVATE_KEY`.
 
 ```bash
+ssh azureuser@PUBLIC_HOST
 cd /opt/shared-infra
-sudo scripts/bootstrap-vm.sh
-scripts/init-env.sh
-```
-
-Edit `.env`. Set `ENV_NAME` (for example `dev`), `PUBLIC_HOST` (hostname or IP, no scheme), and `AZURE_STORAGE_CONNECTION_STRING`. Quote the connection string because it contains semicolons:
-
-```bash
-AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net'
-```
-
-Then:
-
-```bash
-scripts/up.sh
+scripts/print-credentials.sh
 scripts/check.sh
 ```
 
-`scripts/up.sh` renders Grafana, Prometheus, Alertmanager, and Loki config from `.env`, then starts Compose. When the connection string is empty it still starts the other services and leaves the log worker off. Prometheus will show that worker down until you set the string and run `scripts/up.sh` again.
+Edit `.env` when you want a webhook or a different retention value, then run `scripts/up.sh` again. Quote the connection string because it contains semicolons.
+
+`scripts/up.sh` renders Grafana, Prometheus, Alertmanager, and Loki config from `.env`, then starts Compose. When the connection string is empty it still starts the other services and leaves the log worker off. Prometheus will show that worker down until the string is set and you run `scripts/up.sh` again.
 
 `scripts/check.sh` signs in, or hits the ready URL, for each host. When the connection string is set, it enqueues one event, waits until Elasticsearch has it, and deletes that test document.
 
@@ -297,7 +290,7 @@ Elasticsearch security is on. TLS stays off inside the Docker network. The netwo
 
 `logs_writer` can create and write `logs-*` and cannot administer the cluster or read other indexes. `logs_reader` can read `logs-*` and open Kibana Discover. Applications do not receive either password.
 
-The storage connection string is an account key in `.env`. To rotate it: create a new key, put it in `.env` on this VM, run `scripts/up.sh`, and set the same value on each application. Managed identity is a later replacement, not this version.
+The storage connection string is an account key. Terraform stores it in Key Vault and in the GitHub environment secret `AZURE_STORAGE_CONNECTION_STRING`. The boot service writes it into `.env`. To rotate it: rotate the storage key, apply this environment so the secret updates, restart the boot service, and set the same value on each application. The worker still uses that connection string.
 
 `.env` is mode `600`. Rendered Grafana and Alertmanager files contain a password or a webhook URL. They are gitignored. `scripts/print-credentials.sh` is for the operator on the VM.
 
@@ -369,4 +362,5 @@ No host port: log worker (this repo's image), node-exporter `prom/node-exporter:
 - `otel/otel-collector.yaml` — OTLP in, Langfuse out
 - `grafana/provisioning/` — datasource template
 - `docs/alerts.md` — alert settings, the three rule templates, and the `logs-*` index they watch
+- `terraform/` — dev, UAT, and production. One virtual machine per environment
 - `scripts/` — bootstrap, init-env, up, check, print-credentials, peek-poison, fire-test-alert

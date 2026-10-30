@@ -30,4 +30,7 @@ else
   "${compose[@]}" --profile worker up -d --build
 fi
 
-"$root/scripts/print-credentials.sh"
+# The boot service sets this so passwords stay out of the journal.
+if [[ "${SHARED_INFRA_QUIET:-}" != "1" ]]; then
+  "$root/scripts/print-credentials.sh"
+fi

@@ -1,0 +1,109 @@
+name: Terraform
+
+on:
+  pull_request:
+    branches: [dev, uat, main]
+  push:
+    branches: [dev, uat, main]
+
+concurrency:
+  group: terraform-${{ github.event_name }}-${{ github.event.pull_request.base.ref || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - name: Format
+        run: terraform fmt -check -recursive terraform
+      - name: Validate
+        run: |
+          terraform -chdir=terraform/bootstrap init -input=false -backend=false
+          terraform -chdir=terraform/bootstrap validate
+          terraform -chdir=terraform init -input=false -backend=false
+          terraform -chdir=terraform validate
+
+  plan:
+    needs: validate
+    if: github.event_name == 'pull_request' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      secrets: write
+    env:
+      TF_TARGET: ${{ github.base_ref }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: "true"
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AZURE_CLIENT_ID_DEV: ${{ vars.AZURE_CLIENT_ID_DEV }}
+      AZURE_CLIENT_ID_UAT: ${{ vars.AZURE_CLIENT_ID_UAT }}
+      AZURE_CLIENT_ID_PROD: ${{ vars.AZURE_CLIENT_ID_PROD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - name: Choose environment
+        id: target
+        run: bash terraform/select-env.sh
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ steps.target.outputs.client_id }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Plan
+        run: |
+          terraform/init.sh "$TF_ENV"
+          terraform -chdir=terraform plan -input=false -lock-timeout=5m -var-file="environments/${TF_ENV}.tfvars"
+
+  apply:
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      secrets: write
+    env:
+      TF_TARGET: ${{ github.ref_name }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: "true"
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AZURE_CLIENT_ID_DEV: ${{ vars.AZURE_CLIENT_ID_DEV }}
+      AZURE_CLIENT_ID_UAT: ${{ vars.AZURE_CLIENT_ID_UAT }}
+      AZURE_CLIENT_ID_PROD: ${{ vars.AZURE_CLIENT_ID_PROD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - name: Choose environment
+        id: target
+        run: bash terraform/select-env.sh
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ steps.target.outputs.client_id }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Apply
+        run: |
+          terraform/init.sh "$TF_ENV"
+          terraform -chdir=terraform apply -input=false -auto-approve -lock-timeout=5m -var-file="environments/${TF_ENV}.tfvars"
