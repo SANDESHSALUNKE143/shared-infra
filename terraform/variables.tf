@@ -133,6 +133,12 @@ variable "github_branch" {
   description = "Branch whose merge applies this environment. dev, uat, or main."
 }
 
+variable "manage_github_environment" {
+  type        = bool
+  description = "Create the GitHub environment and copy Key Vault secrets into it. GitHub Actions sets this. A laptop apply leaves it off, because a fine-grained personal access token often cannot administer environments."
+  default     = false
+}
+
 variable "address_space" {
   type        = list(string)
   description = "Virtual network address space. Each environment uses its own range."

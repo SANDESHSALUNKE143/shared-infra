@@ -41,7 +41,8 @@ resource "azuread_directory_role" "app_admin" {
 }
 
 resource "azuread_directory_role_assignment" "github" {
-  role_id             = azuread_directory_role.app_admin.object_id
+  # Graph stores the role template id. The directory role object id drifts on every plan.
+  role_id             = azuread_directory_role.app_admin.template_id
   principal_object_id = azuread_service_principal.github.object_id
 }
 

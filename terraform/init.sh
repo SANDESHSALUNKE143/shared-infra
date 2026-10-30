@@ -29,7 +29,11 @@ fi
 
 subscription_id="$(az account show --query id -o tsv)"
 # Same formula as state_storage_account_name in terraform/modules/stack/locals.tf.
-hash="$(printf '%s' "$subscription_id" | md5sum | awk '{print $1}' | cut -c1-10)"
+if command -v md5sum >/dev/null 2>&1; then
+  hash="$(printf '%s' "$subscription_id" | md5sum | awk '{print $1}' | cut -c1-10)"
+else
+  hash="$(python3 -c 'import hashlib,sys; print(hashlib.md5(sys.argv[1].encode()).hexdigest()[:10])' "$subscription_id")"
+fi
 account="sttf${env_name}${hash}"
 
 if [[ "$env_name" == "prod" ]]; then
@@ -53,9 +57,22 @@ apply_bootstrap() {
     -var="account_replication_type=${replication}"
 }
 
+backend_file="$root/terraform/bootstrap/backend.tf"
+backend_off="$root/terraform/bootstrap/backend.tf.off"
+restore_backend() {
+  if [[ -f "$backend_off" && ! -f "$backend_file" ]]; then
+    mv "$backend_off" "$backend_file"
+  fi
+}
+trap restore_backend EXIT
+
 if ! az storage account show --name "$account" --resource-group "$rg" >/dev/null 2>&1; then
-  terraform -chdir=terraform/bootstrap init -input=false -backend=false
+  # The state account does not exist yet, so this first apply keeps its state locally.
+  mv "$backend_file" "$backend_off"
+  rm -rf terraform/bootstrap/.terraform
+  terraform -chdir=terraform/bootstrap init -input=false -reconfigure
   apply_bootstrap
+  mv "$backend_off" "$backend_file"
   migrated=0
   for _ in $(seq 1 10); do
     if terraform -chdir=terraform/bootstrap init -input=false -migrate-state -force-copy \

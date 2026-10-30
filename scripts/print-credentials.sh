@@ -23,13 +23,13 @@ Kibana                  http://${host}:5601
   password              ${LOGS_READER_PASSWORD:-}
 
 Langfuse                http://${host}:3003
-  email                 ${LANGFUSE_INIT_USER_EMAIL:-ops@localhost}
+  email                 ${LANGFUSE_INIT_USER_EMAIL:-ops@example.com}
   password              ${LANGFUSE_INIT_USER_PASSWORD:-}
   project public key    ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-}
   project secret key    ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-}
 
 n8n                     http://${host}:5678
-  email                 ${N8N_OWNER_EMAIL:-ops@localhost}
+  email                 ${N8N_OWNER_EMAIL:-ops@example.com}
   password              ${N8N_OWNER_PASSWORD:-}
 
 MLflow                  http://${host}:5000

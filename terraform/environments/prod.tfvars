@@ -4,7 +4,7 @@ resource_group_name = "rg-shared-infra-prod"
 operator_cidrs = ["203.0.113.10/32"]
 # Replace this with the address that should receive alerts and budget mail.
 alert_email                  = "ops@example.com"
-vm_size                      = "Standard_E8s_v5"
+vm_size                      = "Standard_E4s_v3"
 os_disk_size_gb              = 64
 data_disk_size_gb            = 1024
 acr_sku                      = "Premium"

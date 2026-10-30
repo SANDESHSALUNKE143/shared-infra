@@ -16,6 +16,7 @@ locals {
           admin_username     = var.admin_username
           github_repository  = var.github_repository
           github_branch      = var.github_branch
+          public_ip          = azurerm_public_ip.this.ip_address
         })
       },
       {

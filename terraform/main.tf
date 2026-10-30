@@ -17,6 +17,7 @@ module "stack" {
   timezone                     = var.timezone
   github_repository            = var.github_repository
   github_branch                = var.github_branch
+  manage_github_environment    = var.manage_github_environment
   address_space                = var.address_space
   subnet_prefix                = var.subnet_prefix
   backup_retention_days        = var.backup_retention_days

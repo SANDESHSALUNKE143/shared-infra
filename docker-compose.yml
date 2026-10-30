@@ -256,7 +256,7 @@ services:
     image: docker.langfuse.com/langfuse/langfuse:4
     restart: unless-stopped
     logging: *json-logs
-    mem_limit: 1g
+    mem_limit: 2g
     depends_on:
       langfuse-postgres:
         condition: service_healthy
@@ -303,15 +303,16 @@ services:
       LANGFUSE_INIT_PROJECT_NAME: Shared Infra
       LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
       LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY}
-      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-ops@localhost}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-ops@example.com}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Ops}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
+      NODE_OPTIONS: --max-old-space-size=1536
 
   langfuse-worker:
     image: docker.langfuse.com/langfuse/langfuse-worker:4
     restart: unless-stopped
     logging: *json-logs
-    mem_limit: 1g
+    mem_limit: 2g
     depends_on:
       langfuse-postgres:
         condition: service_healthy
@@ -396,10 +397,12 @@ services:
       start_period: 5s
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.22.0
+    build:
+      context: ./mlflow
+    image: shared-infra-mlflow:local
     restart: unless-stopped
     logging: *json-logs
-    mem_limit: 512m
+    mem_limit: 1g
     environment:
       MLFLOW_ADMIN_PASSWORD: ${MLFLOW_ADMIN_PASSWORD}
       MLFLOW_AUTH_CONFIG_PATH: /mlflow/basic_auth.ini
@@ -415,7 +418,7 @@ services:
         admin_password = $$MLFLOW_ADMIN_PASSWORD
         authorization_function = mlflow.server.auth:authenticate_request_basic_auth
         EOF
-        exec mlflow server --app-name basic-auth --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db
+        exec mlflow server --app-name basic-auth --host 0.0.0.0 --port 5000 --workers 1 --backend-store-uri sqlite:////mlflow/mlflow.db
     ports:
       - "5000:5000"
     volumes:
@@ -430,6 +433,7 @@ services:
       N8N_HOST: ${PUBLIC_HOST}
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false"
       N8N_EDITOR_BASE_URL: http://${PUBLIC_HOST}:5678
       WEBHOOK_URL: http://${PUBLIC_HOST}:5678
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}

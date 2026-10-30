@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Write .env with generated passwords when it does not exist yet.
+# Write .env when it does not exist yet. Sign-in passwords are the README password.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,6 +11,10 @@ fi
 hex() {
   openssl rand -hex "$1"
 }
+
+# One sign-in password for every account. It is written in the README.
+# n8n requires an uppercase letter. Do not replace this with hex-only output.
+ui_password='SharedInfraDev2026A'
 
 public_key="pk-lf-$(hex 8)"
 secret_key="sk-lf-$(hex 16)"
@@ -48,38 +52,38 @@ ALERT_POISON_SPIKE_BASELINE=1h
 ALERT_POISON_SPIKE_MIN_RATE=0.01
 
 GRAFANA_ADMIN_USER=admin
-GRAFANA_ADMIN_PASSWORD=$(hex 24)
+GRAFANA_ADMIN_PASSWORD=${ui_password}
 
-ELASTIC_PASSWORD=$(hex 24)
-KIBANA_SYSTEM_PASSWORD=$(hex 24)
-LOGS_WRITER_PASSWORD=$(hex 24)
-LOGS_READER_PASSWORD=$(hex 24)
+ELASTIC_PASSWORD=${ui_password}
+KIBANA_SYSTEM_PASSWORD=${ui_password}
+LOGS_WRITER_PASSWORD=${ui_password}
+LOGS_READER_PASSWORD=${ui_password}
 
-LANGFUSE_INIT_USER_EMAIL=ops@localhost
+LANGFUSE_INIT_USER_EMAIL=ops@example.com
 LANGFUSE_INIT_USER_NAME=Ops
-LANGFUSE_INIT_USER_PASSWORD=$(hex 24)
+LANGFUSE_INIT_USER_PASSWORD=${ui_password}
 LANGFUSE_NEXTAUTH_SECRET=$(hex 32)
 LANGFUSE_SALT=$(hex 16)
 LANGFUSE_ENCRYPTION_KEY=$(hex 32)
 LANGFUSE_INIT_PROJECT_PUBLIC_KEY=${public_key}
 LANGFUSE_INIT_PROJECT_SECRET_KEY=${secret_key}
 LANGFUSE_OTLP_AUTH_HEADER='${otlp_header}'
-LANGFUSE_POSTGRES_PASSWORD=$(hex 24)
-CLICKHOUSE_PASSWORD=$(hex 24)
-REDIS_PASSWORD=$(hex 24)
-MINIO_ROOT_PASSWORD=$(hex 24)
+LANGFUSE_POSTGRES_PASSWORD=${ui_password}
+CLICKHOUSE_PASSWORD=${ui_password}
+REDIS_PASSWORD=${ui_password}
+MINIO_ROOT_PASSWORD=${ui_password}
 
 MLFLOW_ADMIN_USER=admin
-MLFLOW_ADMIN_PASSWORD=$(hex 24)
+MLFLOW_ADMIN_PASSWORD=${ui_password}
 MLFLOW_FLASK_SECRET=$(hex 24)
 
-N8N_OWNER_EMAIL=ops@localhost
-N8N_OWNER_PASSWORD=$(hex 24)
+N8N_OWNER_EMAIL=ops@example.com
+N8N_OWNER_PASSWORD=${ui_password}
 N8N_ENCRYPTION_KEY=$(hex 32)
 
-QDRANT_API_KEY=$(hex 24)
-NEO4J_PASSWORD=$(hex 24)
-SQL_PASSWORD=$(hex 24)
+QDRANT_API_KEY=${ui_password}
+NEO4J_PASSWORD=${ui_password}
+SQL_PASSWORD=${ui_password}
 EOF
 chmod 600 "$env_file"
 echo "Wrote $env_file"

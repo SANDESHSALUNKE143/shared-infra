@@ -22,6 +22,18 @@ POISONED = Counter("log_worker_poison_total", "Events moved to the poison queue"
 STATE = {"healthy": False}
 
 
+def elasticsearch_reachable(client: Elasticsearch) -> bool:
+    """The writer role cannot call cluster APIs, so HEAD / is 403. 401 is a bad password."""
+    try:
+        client.perform_request("HEAD", "/")
+        return True
+    except Exception as exc:
+        status = getattr(exc, "status_code", None)
+        if status is None:
+            status = getattr(getattr(exc, "meta", None), "status", None)
+        return status == 403
+
+
 def _int_env(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -191,7 +203,7 @@ def main() -> None:
 
     while True:
         try:
-            if not es.ping():
+            if not elasticsearch_reachable(es):
                 raise RuntimeError("Elasticsearch ping failed")
             result = run_once(queue, poison, es, batch_size, visibility, wait_seconds, poison_after)
             INDEXED.inc(result.indexed)

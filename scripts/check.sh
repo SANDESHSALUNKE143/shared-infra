@@ -30,8 +30,8 @@ wait_http() {
 }
 
 grafana_user="${GRAFANA_ADMIN_USER:-admin}"
-langfuse_email="${LANGFUSE_INIT_USER_EMAIL:-ops@localhost}"
-n8n_email="${N8N_OWNER_EMAIL:-ops@localhost}"
+langfuse_email="${LANGFUSE_INIT_USER_EMAIL:-ops@example.com}"
+n8n_email="${N8N_OWNER_EMAIL:-ops@example.com}"
 mlflow_user="${MLFLOW_ADMIN_USER:-admin}"
 
 wait_http prometheus "http://127.0.0.1:9090/-/ready"

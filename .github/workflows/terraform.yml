@@ -40,6 +40,7 @@ jobs:
       id-token: write
       contents: read
       secrets: write
+      administration: write
     env:
       TF_TARGET: ${{ github.base_ref }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -68,7 +69,7 @@ jobs:
       - name: Plan
         run: |
           terraform/init.sh "$TF_ENV"
-          terraform -chdir=terraform plan -input=false -lock-timeout=5m -var-file="environments/${TF_ENV}.tfvars"
+          terraform -chdir=terraform plan -input=false -lock-timeout=5m -var manage_github_environment=true -var-file="environments/${TF_ENV}.tfvars"
 
   apply:
     needs: validate
@@ -78,6 +79,7 @@ jobs:
       id-token: write
       contents: read
       secrets: write
+      administration: write
     env:
       TF_TARGET: ${{ github.ref_name }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -106,4 +108,4 @@ jobs:
       - name: Apply
         run: |
           terraform/init.sh "$TF_ENV"
-          terraform -chdir=terraform apply -input=false -auto-approve -lock-timeout=5m -var-file="environments/${TF_ENV}.tfvars"
+          terraform -chdir=terraform apply -input=false -auto-approve -lock-timeout=5m -var manage_github_environment=true -var-file="environments/${TF_ENV}.tfvars"

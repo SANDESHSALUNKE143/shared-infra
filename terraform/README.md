@@ -10,15 +10,15 @@ Terraform does not create the resource group and does not delete it. Create thes
 | uat | `rg-shared-infra-uat` | `uat` |
 | prod | `rg-shared-infra-prod` | `main` |
 
-A pull request from a collaborator plans that environment. A merge into the branch applies it. Format and validate run on every pull request. Apply runs in GitHub Actions, not on a laptop.
+A pull request from a collaborator plans that environment. A merge into the branch applies it. Format and validate run on every pull request. The first apply for an environment runs on a laptop signed in with the Azure CLI, because that apply creates the GitHub app the workflow uses afterward. Later applies run in GitHub Actions.
 
 ## Sizes
 
-Dev is the smallest size that still has the 32 GiB the stack needs. UAT sits between dev and production. Production is the full size.
+Dev, UAT, and production use `Standard_E4s_v3`. That is the smallest size with the 32 GiB the stack needs, and it is the family this Central India subscription can create. The v5 families have a quota of zero here. Production still keeps the larger disk, registry, backup, and the always-on window.
 
 | | dev | uat | prod |
 | --- | --- | --- | --- |
-| Virtual machine | `Standard_E4s_v5` (4 vCPU, 32 GiB) | `Standard_D8s_v5` (8 vCPU, 32 GiB) | `Standard_E8s_v5` (8 vCPU, 64 GiB) |
+| Virtual machine | `Standard_E4s_v3` (4 vCPU, 32 GiB) | `Standard_E4s_v3` (4 vCPU, 32 GiB) | `Standard_E4s_v3` (4 vCPU, 32 GiB) |
 | Data disk | 256 GiB | 512 GiB | 1024 GiB |
 | Registry | Basic | Standard | Premium, zone redundant |
 | Backup | 7 daily copies, local | 14 daily copies, local | 30 daily copies, geo-redundant |
@@ -47,11 +47,11 @@ Inside the resource group:
 - On dev and UAT, a stop at 20:00 and a Logic App that starts the machine at 08:00. Production has neither.
 - An app registration whose federated credential trusts `https://token.actions.githubusercontent.com` for this repository and that environment's branch. A second credential trusts pull requests so a plan can sign in.
 
-GitHub environments `dev`, `uat`, and `prod` receive `AZURE_STORAGE_CONNECTION_STRING`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, and `VM_SSH_PRIVATE_KEY`.
+The laptop apply leaves GitHub environment secrets alone. The workflow sets `manage_github_environment=true`, and its token can administer environments. That run writes `AZURE_STORAGE_CONNECTION_STRING`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, and `VM_SSH_PRIVATE_KEY` on the `dev`, `uat`, and `prod` environments. A laptop token with that permission can pass the same variable.
 
 ## The virtual machine
 
-Cloud-init starts `shared-infra-boot.service`. The service waits for the data disk, formats it once, installs Docker, clones this repository, reads the connection string from Key Vault, and runs `scripts/up.sh`. Passwords for Grafana and the other UIs are generated on the machine by `scripts/init-env.sh`. Read them with `scripts/print-credentials.sh` after you SSH in.
+Cloud-init starts `shared-infra-boot.service`. The service waits for the data disk, formats it once, installs Docker, clones this repository, reads the connection string from Key Vault, and runs `scripts/up.sh`. `scripts/init-env.sh` writes the same sign-in password on dev, UAT, and production: `SharedInfraDev2026A`. Terraform does not generate a different one. Read the accounts with `scripts/print-credentials.sh` after you SSH in.
 
 The clone uses the branch that applies the environment (`dev`, `uat`, or `main`). Create `dev` and `uat` from `main` before the first apply of those environments.
 

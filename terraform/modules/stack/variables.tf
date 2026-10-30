@@ -78,6 +78,12 @@ variable "github_branch" {
   description = "Branch whose merge applies this environment."
 }
 
+variable "manage_github_environment" {
+  type        = bool
+  description = "Create the GitHub environment and copy Key Vault secrets into it."
+  default     = false
+}
+
 variable "address_space" {
   type        = list(string)
   description = "Virtual network address space."

@@ -20,6 +20,96 @@ Docker volumes sit on a data disk of 256 GiB (dev), 512 GiB (UAT), or 1024 GiB (
 
 The sizes, the monthly budget, and the operator addresses are tfvars. The longer page is [terraform/README.md](terraform/README.md).
 
+## Deploy
+
+Each environment is the same Terraform module and the same Compose file. The differences are the tfvars file and the git branch. Terraform does not create the resource group. Create that empty group first.
+
+```bash
+az group create --name rg-shared-infra-dev --location centralindia
+```
+
+UAT is `rg-shared-infra-uat`. Production is `rg-shared-infra-prod`. The names live in `terraform/environments/<environment>.tfvars`.
+
+Before the first apply, set `operator_cidrs` to your public address and `alert_email` to a mailbox you read. The firewall allows SSH and the login pages only from `operator_cidrs`. The subscription policy **Deny virtual machines except Kibana** rejects every virtual machine whose name is not on its list, so `vm-infra-dev`, `vm-infra-uat`, and `vm-infra-prod` have to be on that list. Dev, UAT, and production use `Standard_E4s_v3` (4 vCPU, 32 GiB). This subscription has no v5 quota in Central India, and the stack needs 32 GiB. The sign-in password is the same on every environment.
+
+Sign in with the Azure CLI, then run the first apply from a checkout. That apply creates the GitHub app, so it cannot be the GitHub Actions workflow yet.
+
+```bash
+export ARM_SUBSCRIPTION_ID=<subscription>
+export ARM_TENANT_ID=<tenant>
+export ARM_USE_CLI=true
+bash terraform/init.sh dev
+terraform -chdir=terraform apply -input=false -var-file=environments/dev.tfvars
+```
+
+`terraform/init.sh dev` creates the state storage account in the resource group on the first run, then points Terraform at it. Repeat with `uat` or `prod` and that environment's tfvars when you are ready for those environments. Create the `dev` and `uat` branches on GitHub before the virtual machine boots, because cloud-init clones that branch.
+
+After the apply, copy the output `github_client_id` into the GitHub variable `AZURE_CLIENT_ID_DEV`. Also set `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`. The next push to `dev` applies through GitHub Actions. UAT follows `uat`, and production follows `main`. The workflow token needs permission to administer GitHub environments. The storage connection string, the registry password, and the SSH private key are in Key Vault either way. Their secret names are `storage-connection-string`, `registry-password`, and `vm-ssh-private-key`.
+
+Cloud-init starts `shared-infra-boot.service`. The service waits for the data disk, formats it once, mounts it at `/var/lib/docker`, installs Docker, clones this repository, reads the storage connection string from Key Vault, and runs `scripts/up.sh`. A Standard public IP is blank in Azure instance metadata, so the boot script uses the address Terraform already created. `scripts/init-env.sh` writes `.env` once, mode `600`, and does not overwrite it. `scripts/up.sh` renders Grafana, Prometheus, Alertmanager, and Loki, then starts Compose.
+
+The dev machine from the first apply:
+
+| | |
+| --- | --- |
+| Resource group | `rg-shared-infra-dev` in Central India |
+| Virtual machine | `vm-infra-dev` |
+| SSH | `ssh azureuser@20.235.66.42` |
+| Grafana | http://20.235.66.42:3000 |
+| Kibana | http://20.235.66.42:5601 |
+| Langfuse | http://20.235.66.42:3003 |
+| n8n | http://20.235.66.42:5678 |
+| MLflow | http://20.235.66.42:5000 |
+| Qdrant | http://20.235.66.42:6333 |
+| Neo4j Browser | http://20.235.66.42:7474 |
+| Neo4j Bolt | `bolt://20.235.66.42:7687` |
+
+Prometheus `9090`, Alertmanager `9093`, Loki `3100`, Elasticsearch `9200`, and app Postgres `5432` listen on `127.0.0.1` on that machine. OpenTelemetry `4317` and `4318` accept traffic from the virtual network.
+
+## Sign-in accounts
+
+The usernames below are the same on every environment. Terraform does not create these passwords. `scripts/init-env.sh` writes them once, the first time the virtual machine boots, into `/opt/shared-infra/.env` with mode `600`. Every sign-in password is the same value:
+
+`SharedInfraDev2026A`
+
+n8n rejects a password with no uppercase letter, and both n8n and Langfuse reject an email on `localhost`. Both owners are `ops@example.com`. Encryption keys (`LANGFUSE_NEXTAUTH_SECRET`, `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY`, `N8N_ENCRYPTION_KEY`, `MLFLOW_FLASK_SECRET`) stay random. They are not typed into a login form. The Langfuse project keys keep the `pk-lf-` and `sk-lf-` prefixes and are printed by `scripts/print-credentials.sh`.
+
+Print the passwords for the machine you are on. Do not commit that output. The SSH user is `azureuser`. The private key is the Key Vault secret `vm-ssh-private-key`.
+
+```bash
+ssh azureuser@PUBLIC_HOST
+cd /opt/shared-infra
+scripts/print-credentials.sh
+```
+
+Replace `PUBLIC_HOST` with the virtual machine's public IP. On the dev machine from the first apply that address is `20.235.66.42`.
+
+| Service | URL | User | Password variable | A working sign-in |
+| --- | --- | --- | --- | --- |
+| Grafana | `http://PUBLIC_HOST:3000` | `admin` | `GRAFANA_ADMIN_PASSWORD` | The Grafana home page, not the login form |
+| Kibana | `http://PUBLIC_HOST:5601` | `logs_reader` | `LOGS_READER_PASSWORD` | Elastic home. Data view **Application logs**, index `logs-*`, time field `@timestamp` |
+| Kibana break-glass | `http://PUBLIC_HOST:5601` | `elastic` | `ELASTIC_PASSWORD` | Same Kibana home, with cluster admin |
+| Langfuse | `http://PUBLIC_HOST:3003` | `ops@example.com` | `LANGFUSE_INIT_USER_PASSWORD` | The Langfuse project **Shared Infra** |
+| n8n | `http://PUBLIC_HOST:5678` | `ops@example.com` | `N8N_OWNER_PASSWORD` | The workflow list |
+| MLflow | `http://PUBLIC_HOST:5000` | `admin` | `MLFLOW_ADMIN_PASSWORD` | The browser basic-auth prompt, then the MLflow UI. The experiment list includes **Default** |
+| Qdrant | `http://PUBLIC_HOST:6333` | none | `QDRANT_API_KEY` | Send header `api-key`. The collections URL returns JSON |
+| Neo4j Browser | `http://PUBLIC_HOST:7474` | `neo4j` | `NEO4J_PASSWORD` | Connect URL `neo4j://PUBLIC_HOST:7687`. The connect form is the page before you sign in |
+| App Postgres | `127.0.0.1:5432` on the VM | `app` | `SQL_PASSWORD` | Database `app`. `pg_isready -U app -d app` accepts connections |
+| Elasticsearch | `http://127.0.0.1:9200` on the VM | `elastic` | `ELASTIC_PASSWORD` | HTTP 200 with the cluster name. Without a password the same URL returns 401 |
+| Elasticsearch writer | not published | `logs_writer` | `LOGS_WRITER_PASSWORD` | Used only by the log worker |
+| Elasticsearch for Kibana | not published | `kibana_system` | `KIBANA_SYSTEM_PASSWORD` | Used only by the Kibana container |
+| Langfuse Postgres | not published | `postgres` | `LANGFUSE_POSTGRES_PASSWORD` | Database `postgres` on the `langfuse-postgres` container |
+| ClickHouse | not published | `clickhouse` | `CLICKHOUSE_PASSWORD` | Used by Langfuse |
+| Redis | not published | none | `REDIS_PASSWORD` | Used by Langfuse |
+| MinIO | not published | `minio` | `MINIO_ROOT_PASSWORD` | Used by Langfuse for event and media storage |
+| Langfuse project | API | public key `pk-lf-…` | `LANGFUSE_INIT_PROJECT_SECRET_KEY` (`sk-lf-…`) | `LANGFUSE_INIT_PROJECT_PUBLIC_KEY` is the public half |
+
+Prometheus (`127.0.0.1:9090`), Alertmanager (`127.0.0.1:9093`), Loki (`127.0.0.1:3100`), the OpenTelemetry collector (`4317`, `4318`, and `127.0.0.1:13133`), node-exporter, and the log worker have no login. Open them through an SSH tunnel, or open Prometheus, Loki, and Alertmanager from Grafana. The collector accepts traces from the virtual network only.
+
+Langfuse also stores `LANGFUSE_NEXTAUTH_SECRET`, `LANGFUSE_SALT`, and `LANGFUSE_ENCRYPTION_KEY`. n8n stores `N8N_ENCRYPTION_KEY`. MLflow stores `MLFLOW_FLASK_SECRET`. Those are not sign-in passwords. The login pages are HTTP, so n8n runs with `N8N_SECURE_COOKIE=false`. After the first Langfuse login, set the project data retention to 30 days in the Langfuse project settings. This Compose file does not set that.
+
+`scripts/check.sh` signs in with these same accounts. A passing run is the confirmation that the passwords in `.env` match the running services.
+
 ## Architecture
 
 Read the pictures in this order. The first is the only path application logs take. The second is what you do on the VM. The third is how a problem becomes an alert. The last picture is every host on that VM.
@@ -43,7 +133,7 @@ A good event has `schema_version` 1, a `timestamp`, and an `environment`. The in
 
 ### What you run
 
-Terraform creates the Azure resources. The boot service on the virtual machine generates passwords, starts Compose, and the UIs that have a login come up.
+Terraform creates the Azure resources. The boot service on the virtual machine writes the sign-in password from `scripts/init-env.sh`, starts Compose, and the UIs that have a login come up.
 
 ```mermaid
 flowchart TD
@@ -164,32 +254,6 @@ Edit `.env` when you want a webhook or a different retention value, then run `sc
 `scripts/check.sh` signs in, or hits the ready URL, for each host. When the connection string is set, it enqueues one event, waits until Elasticsearch has it, and deletes that test document.
 
 `docker compose down -v` deletes every named volume. Dashboards, logs, traces, and databases go with it. `docker compose restart` keeps them.
-
-## Accounts and passwords
-
-Usernames are fixed. `scripts/init-env.sh` generates a password per account and writes `.env` with mode `600`. The file is gitignored. `scripts/print-credentials.sh` prints the URL, username, and password on the VM. Do not commit that output.
-
-| Service | User | Password variable |
-| --- | --- | --- |
-| Grafana | `admin` | `GRAFANA_ADMIN_PASSWORD` |
-| Elasticsearch break-glass | `elastic` | `ELASTIC_PASSWORD` |
-| Kibana's login to Elasticsearch | `kibana_system` | `KIBANA_SYSTEM_PASSWORD` |
-| Log ingest, worker only | `logs_writer` | `LOGS_WRITER_PASSWORD` |
-| Log read, Grafana and Kibana | `logs_reader` | `LOGS_READER_PASSWORD` |
-| Langfuse | `LANGFUSE_INIT_USER_EMAIL` (`ops@localhost`) | `LANGFUSE_INIT_USER_PASSWORD` |
-| Langfuse Postgres | `postgres` | `LANGFUSE_POSTGRES_PASSWORD` |
-| ClickHouse | `clickhouse` | `CLICKHOUSE_PASSWORD` |
-| Redis | password only | `REDIS_PASSWORD` |
-| MinIO | `minio` | `MINIO_ROOT_PASSWORD` |
-| MLflow | `admin` | `MLFLOW_ADMIN_PASSWORD` |
-| n8n owner | `N8N_OWNER_EMAIL` (`ops@localhost`) | `N8N_OWNER_PASSWORD` |
-| Qdrant | API key only | `QDRANT_API_KEY` |
-| Neo4j | `neo4j` | `NEO4J_PASSWORD` |
-| App Postgres, database `app` | `app` | `SQL_PASSWORD` |
-
-Prometheus, Alertmanager, Loki, the collector, node-exporter, and the worker have no login. Grafana is how you open Prometheus, Loki, Alertmanager, and Elasticsearch. Langfuse also needs `LANGFUSE_NEXTAUTH_SECRET`, `LANGFUSE_SALT`, and `LANGFUSE_ENCRYPTION_KEY`. n8n needs `N8N_ENCRYPTION_KEY`.
-
-After the first Langfuse login, set the project data retention to 30 days in the Langfuse project settings. This Compose file does not set that.
 
 ## Use the UIs
 
@@ -334,7 +398,7 @@ Published on the VM, with a login:
 | 5601 | Kibana | `docker.elastic.co/kibana/kibana:8.17.4` |
 | 3003 | Langfuse | `docker.langfuse.com/langfuse/langfuse:4` and `langfuse-worker:4` |
 | 5678 | n8n | `n8nio/n8n:1.90.2` |
-| 5000 | MLflow | `ghcr.io/mlflow/mlflow:v2.22.0` |
+| 5000 | MLflow | `shared-infra-mlflow:local`, built from `ghcr.io/mlflow/mlflow:v2.22.0` with the auth extra |
 | 7474, 7687 | Neo4j | `neo4j:5.26.4` |
 | 6333 | Qdrant | `qdrant/qdrant:v1.13.4` |
 | 4317, 4318 | OpenTelemetry collector | `otel/opentelemetry-collector:0.128.0` |

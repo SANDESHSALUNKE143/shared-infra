@@ -66,10 +66,10 @@ if [ -z "$conn" ] || [ "$conn" = "null" ]; then
   exit 1
 fi
 
-meta=$(curl -fsS -H Metadata:true "http://169.254.169.254/metadata/instance?api-version=2021-02-01")
-public_host=$(printf '%s' "$meta" | jq -r '.network.interface[0].ipv4.ipAddress[0].publicIpAddress')
-if [ -z "$public_host" ] || [ "$public_host" = "null" ]; then
-  echo "The instance metadata service did not return a public IP." >&2
+# A Standard public IP stays blank in instance metadata, so the address is rendered here.
+public_host='${public_ip}'
+if [ -z "$public_host" ]; then
+  echo "Terraform did not render a public IP." >&2
   exit 1
 fi
 

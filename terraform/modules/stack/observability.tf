@@ -137,12 +137,23 @@ locals {
     {
       key_vault = azurerm_key_vault.this.id
       registry  = azurerm_container_registry.this.id
-      nsg       = azurerm_network_security_group.this.id
     },
     var.enable_night_shutdown ? {
       logic_app = azurerm_logic_app_workflow.start[0].id
     } : {}
   )
+}
+
+# Network security groups reject AllMetrics unless metric export is enabled
+# on the subscription. Their event and rule-counter logs still ship.
+resource "azurerm_monitor_diagnostic_setting" "nsg" {
+  name                       = "diag-nsg"
+  target_resource_id         = azurerm_network_security_group.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category_group = "allLogs"
+  }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "logs" {
