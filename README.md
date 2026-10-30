@@ -48,39 +48,20 @@ After the apply, copy the output `github_client_id` into the GitHub variable `AZ
 
 Cloud-init starts `shared-infra-boot.service`. The service waits for the data disk, formats it once, mounts it at `/var/lib/docker`, installs Docker, clones this repository, reads the storage connection string from Key Vault, and runs `scripts/up.sh`. A Standard public IP is blank in Azure instance metadata, so the boot script uses the address Terraform already created. `scripts/init-env.sh` writes `.env` once, mode `600`, and does not overwrite it. `scripts/up.sh` renders Grafana, Prometheus, Alertmanager, and Loki, then starts Compose.
 
-The dev machine from the first apply:
+Dev, UAT, and production run the same module and the same Compose file. The apply prints `public_ip`. The sign-in password below is the same on every environment. There is no standing virtual machine; create one only when you are ready to use that environment.
 
-| | |
+| Service | URL |
 | --- | --- |
-| Resource group | `rg-shared-infra-dev` in Central India |
-| Virtual machine | `vm-infra-dev` |
-| SSH | `ssh azureuser@20.235.66.42` |
-| Grafana | http://20.235.66.42:3000 |
-| Kibana | http://20.235.66.42:5601 |
-| Langfuse | http://20.235.66.42:3003 |
-| n8n | http://20.235.66.42:5678 |
-| MLflow | http://20.235.66.42:5000 |
-| Qdrant | http://20.235.66.42:6333 |
-| Neo4j Browser | http://20.235.66.42:7474 |
-| Neo4j Bolt | `bolt://20.235.66.42:7687` |
+| Grafana | `http://PUBLIC_IP:3000` |
+| Kibana | `http://PUBLIC_IP:5601` |
+| Langfuse | `http://PUBLIC_IP:3003` |
+| n8n | `http://PUBLIC_IP:5678` |
+| MLflow | `http://PUBLIC_IP:5000` |
+| Qdrant | `http://PUBLIC_IP:6333` |
+| Neo4j Browser | `http://PUBLIC_IP:7474` |
+| Neo4j Bolt | `bolt://PUBLIC_IP:7687` |
 
-The production machine from the first apply uses the same password:
-
-| | |
-| --- | --- |
-| Resource group | `rg-shared-infra-prod` in Central India |
-| Virtual machine | `vm-infra-prod` |
-| SSH | `ssh azureuser@20.219.6.224` |
-| Grafana | http://20.219.6.224:3000 |
-| Kibana | http://20.219.6.224:5601 |
-| Langfuse | http://20.219.6.224:3003 |
-| n8n | http://20.219.6.224:5678 |
-| MLflow | http://20.219.6.224:5000 |
-| Qdrant | http://20.219.6.224:6333 |
-| Neo4j Browser | http://20.219.6.224:7474 |
-| Neo4j Bolt | `bolt://20.219.6.224:7687` |
-
-Prometheus `9090`, Alertmanager `9093`, Loki `3100`, Elasticsearch `9200`, and app Postgres `5432` listen on `127.0.0.1` on that machine. OpenTelemetry `4317` and `4318` accept traffic from the virtual network.
+Prometheus `9090`, Alertmanager `9093`, Loki `3100`, Elasticsearch `9200`, and app Postgres `5432` listen on `127.0.0.1` on that machine. OpenTelemetry `4317` and `4318` accept traffic from the virtual network. SSH is `ssh azureuser@PUBLIC_IP`.
 
 ## Sign-in accounts
 
@@ -98,7 +79,7 @@ cd /opt/shared-infra
 scripts/print-credentials.sh
 ```
 
-Replace `PUBLIC_HOST` with the virtual machine's public IP. On the dev machine from the first apply that address is `20.235.66.42`.
+Replace `PUBLIC_HOST` with the virtual machine's public IP from the apply output.
 
 | Service | URL | User | Password variable | A working sign-in |
 | --- | --- | --- | --- | --- |
